@@ -2,6 +2,7 @@ package com.example.worldpreset.config;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonParseException;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.*;
@@ -32,7 +33,9 @@ public class ModConfig {
             Files.createDirectories(CONFIG_DIR);
             Files.createDirectories(DATAPACKS_DIR);
             try (Writer writer = Files.newBufferedWriter(CONFIG_FILE)) {
-                GSON.toJson(getInstance(), writer);
+                ModConfig config = getInstance();
+                config.normalize();
+                GSON.toJson(config, writer);
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -42,12 +45,44 @@ public class ModConfig {
     private static ModConfig load() {
         if (Files.exists(CONFIG_FILE)) {
             try (Reader reader = Files.newBufferedReader(CONFIG_FILE)) {
-                return GSON.fromJson(reader, ModConfig.class);
-            } catch (IOException e) {
+                ModConfig config = GSON.fromJson(reader, ModConfig.class);
+                if (config != null) {
+                    config.normalize();
+                    return config;
+                }
+            } catch (IOException | JsonParseException e) {
                 e.printStackTrace();
             }
         }
         return new ModConfig();
+    }
+
+    private void normalize() {
+        if (this.worldPreset == null) {
+            this.worldPreset = "";
+        }
+        if (this.gamemode == null) {
+            this.gamemode = "";
+        }
+
+        if (this.datapacks == null) {
+            this.datapacks = new ArrayList<>();
+        } else {
+            this.datapacks = new ArrayList<>(new LinkedHashSet<>(this.datapacks));
+            this.datapacks.removeIf(Objects::isNull);
+        }
+
+        if (this.gameRules == null) {
+            this.gameRules = new LinkedHashMap<>();
+        } else {
+            Map<String, String> normalizedRules = new LinkedHashMap<>();
+            this.gameRules.forEach((rule, value) -> {
+                if (rule != null && value != null) {
+                    normalizedRules.put(rule, value);
+                }
+            });
+            this.gameRules = normalizedRules;
+        }
     }
 
     public static Path getDatapacksDir() {
@@ -60,7 +95,7 @@ public class ModConfig {
     }
 
     public static void copyDatapacksToWorld(String worldName) {
-        Path sourceDir = getDatapacksDir();
+        Path sourceDir = getDatapacksDir().normalize();
         Path worldDir = FabricLoader.getInstance().getGameDir().resolve("saves").resolve(worldName);
         Path worldDatapacks = worldDir.resolve("datapacks");
 
@@ -68,15 +103,20 @@ public class ModConfig {
 
         try {
             Files.createDirectories(worldDatapacks);
-            try (DirectoryStream<Path> stream = Files.newDirectoryStream(sourceDir)) {
-                for (Path source : stream) {
-                    Path target = worldDatapacks.resolve(source.getFileName());
-                    if (!Files.exists(target)) {
-                        if (Files.isDirectory(source)) {
-                            copyDirectory(source, target);
-                        } else {
-                            Files.copy(source, target);
-                        }
+            for (String datapack : getInstance().datapacks) {
+                Path source = sourceDir.resolve(datapack).normalize();
+                if (!source.startsWith(sourceDir)
+                    || source.equals(sourceDir)
+                    || !Files.exists(source)) {
+                    continue;
+                }
+
+                Path target = worldDatapacks.resolve(source.getFileName());
+                if (!Files.exists(target)) {
+                    if (Files.isDirectory(source)) {
+                        copyDirectory(source, target);
+                    } else {
+                        Files.copy(source, target);
                     }
                 }
             }
