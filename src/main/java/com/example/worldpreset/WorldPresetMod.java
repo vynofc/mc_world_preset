@@ -8,11 +8,6 @@ import net.minecraft.world.level.GameType;
 public class WorldPresetMod implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
-        ServerLifecycleEvents.SERVER_STARTING.register(server -> {
-            String worldName = server.getWorldData().getLevelName();
-            ModConfig.copyDatapacksToWorld(worldName);
-        });
-
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
             ModConfig config = ModConfig.getInstance();
 

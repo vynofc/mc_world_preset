@@ -94,48 +94,4 @@ public class ModConfig {
         return DATAPACKS_DIR;
     }
 
-    public static void copyDatapacksToWorld(String worldName) {
-        Path sourceDir = getDatapacksDir().normalize();
-        Path worldDir = FabricLoader.getInstance().getGameDir().resolve("saves").resolve(worldName);
-        Path worldDatapacks = worldDir.resolve("datapacks");
-
-        if (!Files.exists(sourceDir)) return;
-
-        try {
-            Files.createDirectories(worldDatapacks);
-            for (String datapack : getInstance().datapacks) {
-                Path source = sourceDir.resolve(datapack).normalize();
-                if (!source.startsWith(sourceDir)
-                    || source.equals(sourceDir)
-                    || !Files.exists(source)) {
-                    continue;
-                }
-
-                Path target = worldDatapacks.resolve(source.getFileName());
-                if (!Files.exists(target)) {
-                    if (Files.isDirectory(source)) {
-                        copyDirectory(source, target);
-                    } else {
-                        Files.copy(source, target);
-                    }
-                }
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
     }
-
-    private static void copyDirectory(Path source, Path target) throws IOException {
-        Files.createDirectories(target);
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(source)) {
-            for (Path file : stream) {
-                Path targetFile = target.resolve(file.getFileName());
-                if (Files.isDirectory(file)) {
-                    copyDirectory(file, targetFile);
-                } else {
-                    Files.copy(file, targetFile);
-                }
-            }
-        }
-    }
-}
